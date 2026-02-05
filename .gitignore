@@ -1,0 +1,76 @@
+# Terraform - Exclude runtime and state files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+
+# Terraform - Keep our configuration files
+# !terraform.tfvars (we want to keep these)
+
+# Exclude sensitive tfvars (if any)
+# *.auto.tfvars
+# secret.tfvars
+# production.tfvars
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# AWS credentials (never commit these)
+.aws/credentials
+.aws/config
+aws-exports.js
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*.temp
+
+# IAM role setup temporary files
+trust-policy-*.json
+permissions-policy.json
+
+# Infracost reports
+infracost-report-*.html
+infracost-report-*.json
+infracost-base.json
+
+# Kubeconfig files (if any)
+kubeconfig-*

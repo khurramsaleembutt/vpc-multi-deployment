@@ -1,0 +1,175 @@
+name: Multi-Account VPC Deployment
+
+on:
+  push:
+    branches: [main]
+    paths: ['vpc-multi-deployment/**']
+  pull_request:
+    branches: [main]
+    paths: ['vpc-multi-deployment/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev-account1-us-east-1'
+        type: choice
+        options:
+        - dev-account1-us-east-1
+        - dev-account1-us-west-2
+        - dev-account2-us-east-1
+        - dev-account2-us-west-2
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+        - plan
+        - apply
+        - destroy
+
+env:
+  TF_VERSION: "1.6.0"
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+    
+    strategy:
+      matrix:
+        environment: 
+          - dev-account1-us-east-1
+          - dev-account1-us-west-2
+          - dev-account2-us-east-1
+          - dev-account2-us-west-2
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      if: contains(matrix.environment, 'account1')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ matrix.environment }}
+
+    - name: Configure AWS Credentials Account 2
+      if: contains(matrix.environment, 'account2')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT2 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ matrix.environment }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform init
+
+    - name: Terraform Plan
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform show -json tfplan > plan.json
+
+    - name: Upload Plan Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan-${{ matrix.environment }}
+        path: ./environments/${{ matrix.environment }}/plan.json
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    needs: terraform-plan
+    
+    strategy:
+      matrix:
+        environment: 
+          - dev-account1-us-east-1
+          - dev-account1-us-west-2
+          - dev-account2-us-east-1
+          - dev-account2-us-west-2
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      if: contains(matrix.environment, 'account1')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ matrix.environment }}
+
+    - name: Configure AWS Credentials Account 2
+      if: contains(matrix.environment, 'account2')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT2 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ matrix.environment }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform init
+
+    - name: Terraform Apply
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform apply -var-file="terraform.tfvars" -auto-approve
+
+    - name: Output Summary
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform output deployment_summary
+
+  terraform-destroy:
+    name: Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    
+    environment: destruction-approval
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      if: contains(github.event.inputs.environment, 'account1')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+
+    - name: Configure AWS Credentials Account 2
+      if: contains(github.event.inputs.environment, 'account2')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT2 }}
+        aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Destroy
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        terraform init
+        terraform destroy -var-file="terraform.tfvars" -auto-approve
