@@ -3,10 +3,8 @@ name: Multi-Account VPC Deployment
 on:
   push:
     branches: [main]
-    paths: ['vpc-multi-deployment/**']
   pull_request:
     branches: [main]
-    paths: ['vpc-multi-deployment/**']
   workflow_dispatch:
     inputs:
       environment:
