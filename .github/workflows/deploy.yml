@@ -34,7 +34,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
     
     strategy:
       matrix:
@@ -88,7 +88,7 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
     needs: terraform-plan
     
     strategy:
