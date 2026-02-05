@@ -11,6 +11,14 @@ on:
         options:
         - dev-account1-us-east-1
         - dev-account1-us-west-2
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+        - plan
+        - apply
 
 env:
   TF_VERSION: "1.6.0"
@@ -23,6 +31,7 @@ jobs:
   test-remote-state-plan:
     name: Test Remote State Plan
     runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
     
     steps:
     - name: Checkout
@@ -63,3 +72,54 @@ jobs:
         
         echo "Running terraform plan with remote state..."
         terraform plan -var-file="terraform.tfvars"
+
+  test-remote-state-apply:
+    name: Test Remote State Apply
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'apply'
+    needs: test-remote-state-plan
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-test-${{ github.event.inputs.environment }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init (Remote State)
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        echo "Initializing remote state backend..."
+        terraform init
+
+    - name: Terraform Apply (Remote State)
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        
+        echo "Running terraform apply with remote state..."
+        terraform apply -var-file="terraform.tfvars" -auto-approve
+
+    - name: Verify Remote State
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        echo "Checking state in S3..."
+        aws s3 ls s3://terraform-state-vpc-093285711854/vpc/${{ github.event.inputs.environment }}/
+        
+        echo "Listing resources in state..."
+        terraform state list
+
+    - name: Output Summary
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform output deployment_summary
