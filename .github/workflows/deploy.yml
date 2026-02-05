@@ -80,6 +80,8 @@ jobs:
     - name: Terraform Plan
       working-directory: ./environments/${{ matrix.environment }}
       run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform show -json tfplan > plan.json
 
@@ -134,7 +136,10 @@ jobs:
 
     - name: Terraform Apply
       working-directory: ./environments/${{ matrix.environment }}
-      run: terraform apply -var-file="terraform.tfvars" -auto-approve
+      run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        terraform apply -var-file="terraform.tfvars" -auto-approve
 
     - name: Output Summary
       working-directory: ./environments/${{ matrix.environment }}
@@ -173,5 +178,7 @@ jobs:
     - name: Terraform Destroy
       working-directory: ./environments/${{ github.event.inputs.environment }}
       run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         terraform init
         terraform destroy -var-file="terraform.tfvars" -auto-approve
