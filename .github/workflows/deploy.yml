@@ -152,8 +152,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
     
-    environment: destruction-approval
-    
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -164,6 +162,7 @@ jobs:
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
         aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ github.event.inputs.environment }}
 
     - name: Configure AWS Credentials Account 2
       if: contains(github.event.inputs.environment, 'account2')
@@ -171,6 +170,7 @@ jobs:
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT2 }}
         aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-vpc-${{ github.event.inputs.environment }}
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
