@@ -63,6 +63,3 @@ jobs:
         
         echo "Running terraform plan with remote state..."
         terraform plan -var-file="terraform.tfvars"
-        
-        echo "Checking remote state..."
-        terraform state list || echo "No state found"
