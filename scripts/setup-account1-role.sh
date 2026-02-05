@@ -43,6 +43,29 @@ cat > permissions-policy.json << EOF
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::terraform-state-vpc-${ACCOUNT_ID}",
+        "arn:aws:s3:::terraform-state-vpc-${ACCOUNT_ID}/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:${ACCOUNT_ID}:table/terraform-locks-vpc"
     }
   ]
 }

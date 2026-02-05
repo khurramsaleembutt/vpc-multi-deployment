@@ -1,14 +1,15 @@
-name: Multi-Account VPC Deployment
+name: Multi-Account VPC Deployment (DISABLED)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # Disabled - use test-remote-state.yml instead
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy'
+        description: 'Environment to deploy (DISABLED)'
         required: true
         default: 'dev-account1-us-east-1'
         type: choice

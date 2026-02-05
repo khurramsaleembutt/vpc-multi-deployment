@@ -1,0 +1,68 @@
+name: Test Remote State - Account 1 Plan Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'dev-account1-us-east-1'
+        type: choice
+        options:
+        - dev-account1-us-east-1
+        - dev-account1-us-west-2
+
+env:
+  TF_VERSION: "1.6.0"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-remote-state-plan:
+    name: Test Remote State Plan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(github.event.inputs.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-test-${{ github.event.inputs.environment }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Test S3 and DynamoDB Access
+      run: |
+        echo "Testing S3 bucket access..."
+        aws s3 ls s3://terraform-state-vpc-093285711854/ || echo "S3 access failed"
+        
+        echo "Testing DynamoDB table access..."
+        aws dynamodb describe-table --table-name terraform-locks-vpc --region us-east-1 || echo "DynamoDB access failed"
+
+    - name: Terraform Init (Remote State)
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        echo "Testing remote state backend initialization..."
+        terraform init
+
+    - name: Terraform Plan (Remote State)
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        
+        echo "Running terraform plan with remote state..."
+        terraform plan -var-file="terraform.tfvars"
+        
+        echo "Checking remote state..."
+        terraform state list || echo "No state found"
