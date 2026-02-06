@@ -1,15 +1,14 @@
-name: Multi-Account VPC Deployment (DISABLED)
+name: Multi-Account VPC Deployment
 
 on:
-  # Disabled - use test-remote-state.yml instead
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy (DISABLED)'
+        description: 'Environment to deploy'
         required: true
         default: 'dev-account1-us-east-1'
         type: choice
@@ -27,6 +26,7 @@ on:
         - plan
         - apply
         - destroy
+        - destroy-all
 
 env:
   TF_VERSION: "1.6.0"
@@ -178,11 +178,64 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
 
+    - name: Terraform Init
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: terraform init
+
     - name: Terraform Destroy
       working-directory: ./environments/${{ github.event.inputs.environment }}
       run: |
         # Remove AWS profile for CI/CD (use OIDC credentials instead)
         sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
-        terraform init
+        terraform destroy -var-file="terraform.tfvars" -auto-approve
+
+  terraform-destroy-all:
+    name: Terraform Destroy All Environments
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy-all'
+    
+    strategy:
+      matrix:
+        environment: 
+          - dev-account1-us-east-1
+          - dev-account1-us-west-2
+          - dev-account2-us-east-1
+          - dev-account2-us-west-2
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials Account 1
+      if: contains(matrix.environment, 'account1')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-destroy-${{ matrix.environment }}
+
+    - name: Configure AWS Credentials Account 2
+      if: contains(matrix.environment, 'account2')
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT2 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-destroy-${{ matrix.environment }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform init
+
+    - name: Terraform Destroy
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        # Remove AWS profile for CI/CD (use OIDC credentials instead)
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
         terraform destroy -var-file="terraform.tfvars" -auto-approve

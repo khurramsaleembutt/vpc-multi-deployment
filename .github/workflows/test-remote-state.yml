@@ -1,10 +1,14 @@
-name: Test Remote State - Account 1 Plan Only
+name: Test Remote State - Account 1 Plan Only (DISABLED)
 
 on:
+  # Disabled - use deploy.yml instead
+  # workflow_dispatch:
+  #   inputs:
+  #     environment:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to test'
+        description: 'Environment to test (DISABLED)'
         required: true
         default: 'dev-account1-us-east-1'
         type: choice
