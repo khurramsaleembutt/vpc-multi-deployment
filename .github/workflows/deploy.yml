@@ -99,6 +99,9 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
     needs: terraform-plan
     
+    # Require approval for apply operations
+    environment: staging
+    
     strategy:
       matrix:
         environment: 
@@ -194,6 +197,9 @@ jobs:
     name: Terraform Destroy All Environments
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy-all'
+    
+    # Require approval for destroy operations
+    environment: staging
     
     strategy:
       matrix:
