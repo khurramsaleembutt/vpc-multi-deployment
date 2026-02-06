@@ -46,8 +46,8 @@ jobs:
         environment: 
           - dev-account1-us-east-1
           - dev-account1-us-west-2
-          - dev-account2-us-east-1
-          - dev-account2-us-west-2
+          # - dev-account2-us-east-1
+          # - dev-account2-us-west-2
     
     steps:
     - name: Checkout
@@ -104,8 +104,8 @@ jobs:
         environment: 
           - dev-account1-us-east-1
           - dev-account1-us-west-2
-          - dev-account2-us-east-1
-          - dev-account2-us-west-2
+          # - dev-account2-us-east-1
+          # - dev-account2-us-west-2
     
     steps:
     - name: Checkout
@@ -200,8 +200,8 @@ jobs:
         environment: 
           - dev-account1-us-east-1
           - dev-account1-us-west-2
-          - dev-account2-us-east-1
-          - dev-account2-us-west-2
+          # - dev-account2-us-east-1
+          # - dev-account2-us-west-2
     
     steps:
     - name: Checkout
