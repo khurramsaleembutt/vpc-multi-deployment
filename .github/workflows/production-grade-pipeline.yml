@@ -142,13 +142,7 @@ jobs:
           - 🟡 **Change:** ${planData.resource_changes?.filter(r => r.change.actions.includes('update')).length || 0}
           - 🔴 **Destroy:** ${planData.resource_changes?.filter(r => r.change.actions.includes('delete')).length || 0}
           
-          <details>
-          <summary>View Plan Details</summary>
-          
-          \`\`\`
-          ${planData.format_version}
-          \`\`\`
-          </details>
+          **Testing new production-grade CI/CD pipeline! 🚀**
           `;
           
           github.rest.issues.createComment({
