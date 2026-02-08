@@ -1,4 +1,7 @@
 # Single Region VPC Deployment - Account 1, us-east-1
+# Production-Grade Multi-Account VPC Deployment
+# Testing new CI/CD pipeline
+
 terraform {
   required_version = ">= 1.0"
   required_providers {
