@@ -1,6 +1,6 @@
 # Account 1 us-east-1 Configuration
 aws_profile = "my-sso-profile"
-region = "us-east-1"
+region      = "us-east-1"
 
 # Environment
 environment  = "dev-acc1-east"
