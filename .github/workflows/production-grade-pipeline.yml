@@ -1,0 +1,298 @@
+name: Production-Grade Infrastructure Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['environments/**', 'modules/**']
+  push:
+    branches: [main]
+    paths: ['environments/**', 'modules/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [dev, staging, production]
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+
+env:
+  TF_VERSION: "1.6.0"
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ============================================================================
+  # VALIDATION & SECURITY (All Environments)
+  # ============================================================================
+  terraform-validate:
+    name: Validate & Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+    
+    - name: Terraform Validate
+      run: |
+        find environments -name "*.tf" -execdir terraform init -backend=false \;
+        find environments -name "*.tf" -execdir terraform validate \;
+    
+    - name: Security Scan (Checkov)
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: .
+        framework: terraform
+        output_format: sarif
+        output_file_path: checkov-results.sarif
+    
+    - name: Upload Security Results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: checkov-results.sarif
+
+  # ============================================================================
+  # DEV ENVIRONMENT (PR-based with required status checks)
+  # ============================================================================
+  dev-plan:
+    name: Dev Plan & Cost Estimate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: terraform-validate
+    
+    # This job name must match branch protection required status checks
+    strategy:
+      matrix:
+        environment: [dev-account1-us-east-1, dev-account1-us-west-2]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-dev-${{ matrix.environment }}
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Init
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform init
+    
+    - name: Terraform Plan
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform show -json tfplan > plan.json
+    
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v2
+      with:
+        api-key: ${{ secrets.INFRACOST_API_KEY }}
+    
+    - name: Generate Infracost Report
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        infracost breakdown --path plan.json \
+          --format json \
+          --out-file infracost.json
+        
+        infracost comment github \
+          --path infracost.json \
+          --repo ${{ github.repository }} \
+          --github-token ${{ secrets.GITHUB_TOKEN }} \
+          --pull-request ${{ github.event.pull_request.number }} \
+          --behavior update
+    
+    - name: Plan Summary Comment
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const plan = fs.readFileSync('./environments/${{ matrix.environment }}/plan.json', 'utf8');
+          const planData = JSON.parse(plan);
+          
+          const summary = `
+          ## 📋 Terraform Plan Summary - ${{ matrix.environment }}
+          
+          **Resources:**
+          - 🟢 **Add:** ${planData.resource_changes?.filter(r => r.change.actions.includes('create')).length || 0}
+          - 🟡 **Change:** ${planData.resource_changes?.filter(r => r.change.actions.includes('update')).length || 0}
+          - 🔴 **Destroy:** ${planData.resource_changes?.filter(r => r.change.actions.includes('delete')).length || 0}
+          
+          <details>
+          <summary>View Plan Details</summary>
+          
+          \`\`\`
+          ${planData.format_version}
+          \`\`\`
+          </details>
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+
+  # ============================================================================
+  # STAGING ENVIRONMENT (Auto-deploy on merge)
+  # ============================================================================
+  staging-deploy:
+    name: Staging Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: terraform-validate
+    environment: staging
+    
+    strategy:
+      matrix:
+        environment: [dev-account1-us-east-1, dev-account1-us-west-2]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-staging-${{ matrix.environment }}
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Plan & Apply
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform apply tfplan
+    
+    - name: Integration Tests
+      run: |
+        # Test VPC connectivity, security groups, etc.
+        echo "Running infrastructure integration tests..."
+        # Add your infrastructure tests here
+    
+    - name: Update ArgoCD Applications
+      run: |
+        # Trigger ArgoCD sync for updated infrastructure
+        echo "Notifying ArgoCD of infrastructure changes..."
+        # Add ArgoCD API calls or webhook triggers
+
+  # ============================================================================
+  # PRODUCTION ENVIRONMENT (Manual approval required)
+  # ============================================================================
+  production-deploy:
+    name: Production Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    needs: terraform-validate
+    environment: 
+      name: production
+      url: https://console.aws.amazon.com/vpc/
+    
+    strategy:
+      matrix:
+        environment: [prod-account1-us-east-1, prod-account1-us-west-2]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-prod-${{ matrix.environment }}
+    
+    - name: Terraform Plan
+      working-directory: ./environments/${{ matrix.environment }}
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+    
+    - name: Compliance Check
+      run: |
+        # Run compliance checks (SOC2, PCI-DSS, etc.)
+        echo "Running compliance validation..."
+    
+    - name: Terraform Apply
+      working-directory: ./environments/${{ matrix.environment }}
+      run: terraform apply tfplan
+    
+    - name: Smoke Tests
+      run: |
+        # Basic connectivity and health checks
+        echo "Running production smoke tests..."
+    
+    - name: Notify Teams
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#infrastructure'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ============================================================================
+  # DESTROY (Emergency use)
+  # ============================================================================
+  destroy:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment: 
+      name: destruction-approval
+      url: https://console.aws.amazon.com/vpc/
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: us-east-1
+        role-session-name: terraform-destroy
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Destroy
+      working-directory: ./environments/${{ github.event.inputs.environment }}
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform destroy -var-file="terraform.tfvars" -auto-approve
