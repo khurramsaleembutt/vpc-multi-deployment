@@ -1,6 +1,6 @@
 # Single Region VPC Deployment - Account 1, us-east-1
 # Production-Grade Multi-Account VPC Deployment
-# Testing new CI/CD pipeline
+# Testing SARIF upload with proper permissions
 
 terraform {
   required_version = ">= 1.0"
