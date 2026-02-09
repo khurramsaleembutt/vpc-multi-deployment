@@ -3,7 +3,7 @@ aws_profile = "my-sso-profile"
 region      = "us-west-2"
 
 # Environment
-environment  = "dev-acc1-west"
+environment  = "Dev"
 project_name = "multi-vpc"
 
 # VPC Configuration
@@ -19,7 +19,8 @@ enable_nat_gateway = false
 # Tags
 common_tags = {
   Project     = "multi-vpc-deployment"
-  Environment = "dev-acc1-west"
+  Environment = "Dev"
+  Service     = "infrastructure"
   Account     = "093285711854"
   Region      = "us-west-2"
   ManagedBy   = "terraform"
