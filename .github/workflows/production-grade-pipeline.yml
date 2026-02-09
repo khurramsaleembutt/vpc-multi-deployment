@@ -7,7 +7,6 @@ on:
   push:
     branches: [main, 'feature/*']
     paths: ['environments/**', 'modules/**']
-    paths: ['environments/**', 'modules/**']
   workflow_dispatch:
     inputs:
       environment:
