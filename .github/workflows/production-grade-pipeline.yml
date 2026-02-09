@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths: ['environments/**', 'modules/**']
   push:
-    branches: [main, 'feature/*']
+    branches: [main]
     paths: ['environments/**', 'modules/**']
   workflow_dispatch:
     inputs:
@@ -28,7 +28,6 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
-  security-events: write
 
 jobs:
   # ============================================================================
@@ -62,7 +61,7 @@ jobs:
         framework: terraform
         output_format: sarif
         output_file_path: checkov-results.sarif
-        skip_check: CKV_AWS_130,CKV_AWS_131,CKV_AWS_135,CKV2_AWS_12
+        skip_check: CKV_AWS_135,CKV2_AWS_12
         soft_fail: true
     
     - name: Upload Security Results
