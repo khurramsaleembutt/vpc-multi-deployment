@@ -34,7 +34,7 @@ provider "aws" {
 # VPC in Primary Region
 module "vpc_primary" {
   source = "../../modules/vpc"
-  
+
   providers = {
     aws = aws.primary
   }
@@ -43,16 +43,16 @@ module "vpc_primary" {
   public_subnet_cidrs  = var.primary_public_subnets
   private_subnet_cidrs = var.primary_private_subnets
   enable_nat_gateway   = var.enable_nat_gateway
-  
-  environment   = var.environment
-  project_name  = var.project_name
-  common_tags   = var.common_tags
+
+  environment  = var.environment
+  project_name = var.project_name
+  common_tags  = var.common_tags
 }
 
 # VPC in Secondary Region
 module "vpc_secondary" {
   source = "../../modules/vpc"
-  
+
   providers = {
     aws = aws.secondary
   }
@@ -61,8 +61,8 @@ module "vpc_secondary" {
   public_subnet_cidrs  = var.secondary_public_subnets
   private_subnet_cidrs = var.secondary_private_subnets
   enable_nat_gateway   = var.enable_nat_gateway
-  
-  environment   = var.environment
-  project_name  = var.project_name
-  common_tags   = var.common_tags
+
+  environment  = var.environment
+  project_name = var.project_name
+  common_tags  = var.common_tags
 }

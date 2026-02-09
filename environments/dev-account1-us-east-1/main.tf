@@ -1,4 +1,7 @@
 # Single Region VPC Deployment - Account 1, us-east-1
+# Production-Grade Multi-Account VPC Deployment
+# Testing new CI/CD pipeline
+
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -27,8 +30,8 @@ module "vpc" {
   public_subnet_cidrs  = var.public_subnets
   private_subnet_cidrs = var.private_subnets
   enable_nat_gateway   = var.enable_nat_gateway
-  
-  environment   = var.environment
-  project_name  = var.project_name
-  common_tags   = var.common_tags
+
+  environment  = var.environment
+  project_name = var.project_name
+  common_tags  = var.common_tags
 }

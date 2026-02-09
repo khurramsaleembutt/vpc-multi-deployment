@@ -1,6 +1,6 @@
 # Account 2 us-west-2 Configuration
 aws_profile = "account2-sso"
-region = "us-west-2"
+region      = "us-west-2"
 
 # Environment
 environment  = "dev-acc2-west"

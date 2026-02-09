@@ -27,8 +27,8 @@ module "vpc" {
   public_subnet_cidrs  = var.public_subnets
   private_subnet_cidrs = var.private_subnets
   enable_nat_gateway   = var.enable_nat_gateway
-  
-  environment   = var.environment
-  project_name  = var.project_name
-  common_tags   = var.common_tags
+
+  environment  = var.environment
+  project_name = var.project_name
+  common_tags  = var.common_tags
 }
