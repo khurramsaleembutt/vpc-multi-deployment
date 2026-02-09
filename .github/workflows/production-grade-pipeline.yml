@@ -79,6 +79,9 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: terraform-validate
     
+    # Access dev environment secrets (including INFRACOST_API_KEY)
+    environment: dev
+    
     # This job name must match branch protection required status checks
     strategy:
       matrix:
