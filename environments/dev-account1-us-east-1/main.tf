@@ -1,6 +1,6 @@
 # Single Region VPC Deployment - Account 1, us-east-1
 # Production-Grade Multi-Account VPC Deployment
-# Testing SARIF upload with proper permissions
+# Testing SARIF upload with proper permissions and destroy workflow fix
 
 terraform {
   required_version = ">= 1.0"
