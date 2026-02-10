@@ -3,10 +3,10 @@ name: Production-Grade Infrastructure Pipeline
 on:
   pull_request:
     branches: [main]
-    paths: ['environments/**', 'modules/**']
+    paths: ['environments/**', 'modules/**', '.github/workflows/production-grade-pipeline.yml']
   push:
     branches: [main]
-    paths: ['environments/**', 'modules/**']
+    paths: ['environments/**', 'modules/**', '.github/workflows/production-grade-pipeline.yml']
   workflow_dispatch:
     inputs:
       environment:
@@ -50,10 +50,23 @@ jobs:
     
     - name: Terraform Validate
       run: |
-        find environments -mindepth 1 -maxdepth 1 -type d \
-          -exec terraform -chdir={} init -backend=false \;
-        find environments -mindepth 1 -maxdepth 1 -type d \
-          -exec terraform -chdir={} validate \;
+        # find environments -mindepth 1 -maxdepth 1 -type d \
+        #   -exec terraform -chdir={} init -backend=false \;
+        # find environments -mindepth 1 -maxdepth 1 -type d \
+        #   -exec terraform -chdir={} validate \;
+        
+        # Validate specific environments we're using
+        terraform -chdir=environments/dev-account1-us-east-1 init -backend=false
+        terraform -chdir=environments/dev-account1-us-east-1 validate
+        
+        terraform -chdir=environments/dev-account1-us-west-2 init -backend=false
+        terraform -chdir=environments/dev-account1-us-west-2 validate
+        
+        terraform -chdir=environments/prod-account1-us-east-1 init -backend=false
+        terraform -chdir=environments/prod-account1-us-east-1 validate
+        
+        terraform -chdir=environments/prod-account1-us-west-2 init -backend=false
+        terraform -chdir=environments/prod-account1-us-west-2 validate
     
     - name: Security Scan (Checkov)
       uses: bridgecrewio/checkov-action@master
@@ -259,6 +272,7 @@ jobs:
         echo "Running production smoke tests..."
     
     - name: Notify Teams
+      if: always()
       uses: 8398a7/action-slack@v3
       with:
         status: ${{ job.status }}
@@ -278,7 +292,7 @@ jobs:
     
     strategy:
       matrix:
-        environment: [dev-account1-us-east-1, dev-account1-us-west-2]
+        environment: [dev-account1-us-east-1, dev-account1-us-west-2, prod-account1-us-east-1, prod-account1-us-west-2]
     
     steps:
     - uses: actions/checkout@v4
