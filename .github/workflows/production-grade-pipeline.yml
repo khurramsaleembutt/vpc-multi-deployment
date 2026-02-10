@@ -249,6 +249,11 @@ jobs:
         aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
         role-session-name: terraform-prod-${{ matrix.environment }}
     
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
     - name: Terraform Plan
       working-directory: ./environments/${{ matrix.environment }}
       run: |
@@ -277,7 +282,8 @@ jobs:
       with:
         status: ${{ job.status }}
         channel: '#infrastructure'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
 
   # ============================================================================
   # DESTROY (Emergency use)
