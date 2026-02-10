@@ -276,6 +276,10 @@ jobs:
       name: destruction-approval
       url: https://console.aws.amazon.com/vpc/
     
+    strategy:
+      matrix:
+        environment: [dev-account1-us-east-1, dev-account1-us-west-2]
+    
     steps:
     - uses: actions/checkout@v4
     
@@ -283,8 +287,8 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
-        aws-region: us-east-1
-        role-session-name: terraform-destroy
+        aws-region: ${{ contains(matrix.environment, 'east') && 'us-east-1' || 'us-west-2' }}
+        role-session-name: terraform-destroy-${{ matrix.environment }}
     
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -292,7 +296,7 @@ jobs:
         terraform_version: ${{ env.TF_VERSION }}
     
     - name: Terraform Destroy
-      working-directory: ./environments/${{ github.event.inputs.environment }}
+      working-directory: ./environments/${{ matrix.environment }}
       run: |
         terraform init
         sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
