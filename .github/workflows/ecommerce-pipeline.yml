@@ -73,9 +73,12 @@ jobs:
   # DEV ENVIRONMENT PLANNING
   # ============================================================================
   dev-plan:
-    name: Dev Plan
+    name: Dev Plan & Cost Estimate
     runs-on: ubuntu-latest
     needs: terraform-validate
+    
+    # Access dev environment secrets (including INFRACOST_API_KEY)
+    environment: dev
     
     steps:
     - uses: actions/checkout@v4
@@ -92,22 +95,36 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
     
+    - name: Terraform Init
+      working-directory: ./environments/dev-account1-us-east-1
+      run: terraform init
+    
     - name: Terraform Plan
       working-directory: ./environments/dev-account1-us-east-1
       run: |
-        terraform init
         sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
-        terraform plan -var-file="terraform.tfvars" -out=tfplan -detailed-exitcode
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform show -json tfplan > plan.json
     
-    - name: Cost Estimation
-      uses: infracost/infracost-action@v1
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v2
       with:
-        api_key: ${{ secrets.INFRACOST_API_KEY }}
-        path: ./environments/dev-account1-us-east-1/plan.json
-        format: json
-        out_file: /tmp/infracost.json
+        api-key: ${{ secrets.INFRACOST_API_KEY }}
+    
+    - name: Generate Infracost Report
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        infracost breakdown --path plan.json \
+          --format json \
+          --out-file infracost.json
+        
+        infracost comment github \
+          --path infracost.json \
+          --repo ${{ github.repository }} \
+          --github-token ${{ secrets.GITHUB_TOKEN }} \
+          --pull-request ${{ github.event.pull_request.number }} \
+          --behavior update
     
     - name: Plan Summary Comment
       uses: actions/github-script@v6
