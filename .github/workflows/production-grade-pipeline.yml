@@ -51,6 +51,11 @@ jobs:
     
     - name: Terraform Validate
       run: |
+        # find environments -mindepth 1 -maxdepth 1 -type d \
+        #   -exec terraform -chdir={} init -backend=false \;
+        # find environments -mindepth 1 -maxdepth 1 -type d \
+        #   -exec terraform -chdir={} validate \;
+        
         # Validate specific environments we're using
         terraform -chdir=environments/dev-account1-us-east-1 init -backend=false
         terraform -chdir=environments/dev-account1-us-east-1 validate
@@ -63,10 +68,6 @@ jobs:
         
         terraform -chdir=environments/prod-account1-us-west-2 init -backend=false
         terraform -chdir=environments/prod-account1-us-west-2 validate
-        
-        # Intentional error for GitOps rollback demo
-        echo "Simulating validation failure..."
-        exit 1
     
     - name: Security Scan (Checkov)
       uses: bridgecrewio/checkov-action@master
