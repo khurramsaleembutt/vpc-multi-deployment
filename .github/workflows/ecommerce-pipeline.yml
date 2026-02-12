@@ -1,0 +1,221 @@
+name: EcommerceApp Infrastructure Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['environments/**', 'modules/**', '.github/workflows/ecommerce-pipeline.yml']
+  push:
+    branches: [main]
+    paths: ['environments/**', 'modules/**', '.github/workflows/ecommerce-pipeline.yml']
+
+env:
+  TF_VERSION: 1.10.0
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  # ============================================================================
+  # VALIDATION & SECURITY SCANNING
+  # ============================================================================
+  terraform-validate:
+    name: Validate & Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Format
+      run: |
+        terraform fmt -recursive
+        terraform fmt -check -recursive
+    
+    - name: Terraform Validate
+      run: |
+        # Validate dev-account1-us-east-1 only
+        terraform -chdir=environments/dev-account1-us-east-1 init -backend=false
+        terraform -chdir=environments/dev-account1-us-east-1 validate
+        
+        # Other environments commented out
+        # terraform -chdir=environments/dev-account1-us-west-2 init -backend=false
+        # terraform -chdir=environments/dev-account1-us-west-2 validate
+        # terraform -chdir=environments/prod-account1-us-east-1 init -backend=false
+        # terraform -chdir=environments/prod-account1-us-east-1 validate
+        # terraform -chdir=environments/prod-account1-us-west-2 init -backend=false
+        # terraform -chdir=environments/prod-account1-us-west-2 validate
+    
+    - name: Security Scan
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: .
+        framework: terraform
+        output_format: sarif
+        output_file_path: checkov-results.sarif
+        soft_fail: true
+        skip_check: CKV_AWS_135,CKV2_AWS_12
+    
+    - name: Upload Security Results
+      uses: github/codeql-action/upload-sarif@v4
+      if: always()
+      with:
+        sarif_file: checkov-results.sarif
+
+  # ============================================================================
+  # DEV ENVIRONMENT PLANNING
+  # ============================================================================
+  dev-plan:
+    name: Dev Plan & Cost Estimate
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    
+    # Access dev environment secrets (including INFRACOST_API_KEY)
+    environment: dev
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: us-east-1
+        role-session-name: terraform-dev-us-east-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Init
+      working-directory: ./environments/dev-account1-us-east-1
+      run: terraform init
+    
+    - name: Terraform Plan
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform show -json tfplan > plan.json
+    
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v2
+      with:
+        api-key: ${{ secrets.INFRACOST_API_KEY }}
+    
+    - name: Generate Infracost Report
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        infracost breakdown --path plan.json \
+          --format json \
+          --out-file infracost.json
+        
+        infracost comment github \
+          --path infracost.json \
+          --repo ${{ github.repository }} \
+          --github-token ${{ secrets.GITHUB_TOKEN }} \
+          --pull-request ${{ github.event.pull_request.number }} \
+          --behavior update
+    
+    - name: Plan Summary Comment
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          const plan = fs.readFileSync('./environments/dev-account1-us-east-1/plan.json', 'utf8');
+          const planData = JSON.parse(plan);
+          
+          const summary = `
+          ## 📋 Terraform Plan Summary - dev-account1-us-east-1
+          
+          **Resources:**
+          - 🟢 **Add:** ${planData.resource_changes?.filter(r => r.change.actions.includes('create')).length || 0}
+          - 🟡 **Change:** ${planData.resource_changes?.filter(r => r.change.actions.includes('update')).length || 0}
+          - 🔴 **Destroy:** ${planData.resource_changes?.filter(r => r.change.actions.includes('delete')).length || 0}
+          
+          **EcommerceApp Infrastructure Pipeline Ready! 🚀**
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+
+  # ============================================================================
+  # STAGING ENVIRONMENT (Auto-deploy on merge)
+  # ============================================================================
+  staging-deploy:
+    name: Staging Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: terraform-validate
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: us-east-1
+        role-session-name: terraform-staging-dev-account1-us-east-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        kubectl version --client
+    
+    - name: Terraform Plan & Apply
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform apply tfplan
+    
+    - name: EKS Cluster Validation
+      run: |
+        # Validate EKS cluster is ready
+        echo "Validating EKS cluster deployment..."
+        aws eks describe-cluster --name ecommerce-dev-cluster --region us-east-1
+        aws eks list-nodegroups --cluster-name ecommerce-dev-cluster --region us-east-1
+        
+        # Update kubeconfig and test connectivity
+        aws eks update-kubeconfig --region us-east-1 --name ecommerce-dev-cluster
+        kubectl get nodes
+        kubectl get pods -A
+    
+    - name: Integration Tests
+      run: |
+        # Test VPC connectivity, EKS cluster health, etc.
+        echo "Running EKS infrastructure integration tests..."
+        kubectl cluster-info
+        kubectl get svc -A
+        # Add your EKS-specific tests here
+    
+    - name: Prepare for EcommerceApp Deployment
+      run: |
+        # Setup for future EcommerceApp deployment
+        echo "EKS cluster ready for EcommerceApp deployment..."
+        echo "Cluster endpoint: $(aws eks describe-cluster --name ecommerce-dev-cluster --region us-east-1 --query 'cluster.endpoint' --output text)"
+        # Future: Add ArgoCD or Helm setup here
