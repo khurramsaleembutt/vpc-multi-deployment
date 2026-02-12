@@ -75,6 +75,7 @@ jobs:
   dev-plan:
     name: Dev Plan & Cost Estimate
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     needs: terraform-validate
     
     # Access dev environment secrets (including INFRACOST_API_KEY)

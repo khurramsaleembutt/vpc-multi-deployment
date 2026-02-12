@@ -147,6 +147,27 @@ resource "aws_eks_access_policy_association" "sso_admin_policy" {
   depends_on = [aws_eks_access_entry.sso_admin]
 }
 
+# EKS Access Entry for GitHub Actions Role
+resource "aws_eks_access_entry" "github_actions" {
+  cluster_name  = aws_eks_cluster.cluster.name
+  principal_arn = "arn:aws:iam::093285711854:role/GitHubActionsVPCRole"
+  type         = "STANDARD"
+
+  tags = var.tags
+}
+
+resource "aws_eks_access_policy_association" "github_actions_policy" {
+  cluster_name  = aws_eks_cluster.cluster.name
+  principal_arn = "arn:aws:iam::093285711854:role/GitHubActionsVPCRole"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.github_actions]
+}
+
 # Cluster Addons
 resource "aws_eks_addon" "addons" {
   for_each = var.cluster_addons
