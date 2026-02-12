@@ -16,6 +16,45 @@ private_subnets = ["10.0.10.0/24", "10.0.20.0/24"]
 # Features - ENABLED FOR ECOMMERCEAPP
 enable_nat_gateway = true
 
+# EKS Configuration
+enable_eks = true
+cluster_name = "ecommerce-dev-cluster"
+cluster_version = "1.33"
+cluster_endpoint_private_access = true
+cluster_endpoint_public_access = true
+cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
+cluster_service_ipv4_cidr = "172.20.0.0/16"
+cluster_enabled_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+cloudwatch_log_group_retention_in_days = 7
+
+# EKS Addons
+cluster_addons = {
+  coredns = {
+    version = "v1.11.3-eksbuild.2"
+    resolve_conflicts_on_create = "OVERWRITE"
+    resolve_conflicts_on_update = "OVERWRITE"
+    service_account_role_arn = ""
+  }
+  kube-proxy = {
+    version = "v1.33.0-eksbuild.1"
+    resolve_conflicts_on_create = "OVERWRITE"
+    resolve_conflicts_on_update = "OVERWRITE"
+    service_account_role_arn = ""
+  }
+  vpc-cni = {
+    version = "v1.19.0-eksbuild.1"
+    resolve_conflicts_on_create = "OVERWRITE"
+    resolve_conflicts_on_update = "OVERWRITE"
+    service_account_role_arn = ""
+  }
+  eks-pod-identity-agent = {
+    version = "v1.3.4-eksbuild.1"
+    resolve_conflicts_on_create = "OVERWRITE"
+    resolve_conflicts_on_update = "OVERWRITE"
+    service_account_role_arn = ""
+  }
+}
+
 # Tags
 common_tags = {
   Project     = "multi-vpc-deployment"

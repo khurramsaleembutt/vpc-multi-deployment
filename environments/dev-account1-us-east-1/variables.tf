@@ -57,3 +57,68 @@ variable "common_tags" {
     Owner       = "devops-team"
   }
 }
+# EKS Variables
+variable "enable_eks" {
+  description = "Enable EKS cluster creation"
+  type        = bool
+  default     = false
+}
+
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = ""
+}
+
+variable "cluster_version" {
+  description = "Kubernetes version for the EKS cluster"
+  type        = string
+  default     = "1.33"
+}
+
+variable "cluster_endpoint_private_access" {
+  description = "Enable private API server endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "cluster_endpoint_public_access" {
+  description = "Enable public API server endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "cluster_endpoint_public_access_cidrs" {
+  description = "List of CIDR blocks that can access the public API server endpoint"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "cluster_service_ipv4_cidr" {
+  description = "Service IPv4 CIDR for the cluster"
+  type        = string
+  default     = "172.20.0.0/16"
+}
+
+variable "cluster_enabled_log_types" {
+  description = "List of control plane logging to enable"
+  type        = list(string)
+  default     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+}
+
+variable "cloudwatch_log_group_retention_in_days" {
+  description = "Number of days to retain log events"
+  type        = number
+  default     = 7
+}
+
+variable "cluster_addons" {
+  description = "Map of cluster addon configurations"
+  type = map(object({
+    version                      = string
+    resolve_conflicts_on_create  = string
+    resolve_conflicts_on_update  = string
+    service_account_role_arn     = string
+  }))
+  default = {}
+}

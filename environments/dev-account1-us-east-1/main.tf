@@ -36,3 +36,29 @@ module "vpc" {
   project_name = var.project_name
   common_tags  = var.common_tags
 }
+
+# EKS Module
+module "eks" {
+  count  = var.enable_eks ? 1 : 0
+  source = "../../modules/eks"
+
+  cluster_name                            = var.cluster_name
+  cluster_version                         = var.cluster_version
+  vpc_id                                  = module.vpc.vpc_id
+  subnet_ids                              = concat(module.vpc.private_subnet_ids, module.vpc.public_subnet_ids)
+  cluster_endpoint_private_access         = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access          = var.cluster_endpoint_public_access
+  cluster_endpoint_public_access_cidrs    = var.cluster_endpoint_public_access_cidrs
+  cluster_service_ipv4_cidr               = var.cluster_service_ipv4_cidr
+  cluster_enabled_log_types               = var.cluster_enabled_log_types
+  cloudwatch_log_group_retention_in_days  = var.cloudwatch_log_group_retention_in_days
+  cluster_addons                          = var.cluster_addons
+  enable_irsa                             = true
+
+  access_config = {
+    bootstrap_cluster_creator_admin_permissions = true
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+  }
+
+  tags = var.common_tags
+}
