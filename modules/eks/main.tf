@@ -128,12 +128,23 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 
 # EKS Access Entry for SSO Role
 resource "aws_eks_access_entry" "sso_admin" {
-  cluster_name      = aws_eks_cluster.cluster.name
-  principal_arn     = "arn:aws:iam::093285711854:role/AWSReservedSSO_AdministratorAccess_4cedde51fb0d9d9a"
-  kubernetes_groups = ["system:masters"]
-  type             = "STANDARD"
+  cluster_name  = aws_eks_cluster.cluster.name
+  principal_arn = "arn:aws:iam::093285711854:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_4cedde51fb0d9d9a"
+  type         = "STANDARD"
 
   tags = var.tags
+}
+
+resource "aws_eks_access_policy_association" "sso_admin_policy" {
+  cluster_name  = aws_eks_cluster.cluster.name
+  principal_arn = "arn:aws:iam::093285711854:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_4cedde51fb0d9d9a"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+
+  depends_on = [aws_eks_access_entry.sso_admin]
 }
 
 # Cluster Addons
@@ -149,5 +160,93 @@ resource "aws_eks_addon" "addons" {
 
   tags = var.tags
 
-  depends_on = [aws_eks_cluster.cluster]
+  depends_on = [
+    aws_eks_cluster.cluster,
+    aws_eks_node_group.node_groups
+  ]
+}
+
+# Node Group IAM Role
+resource "aws_iam_role" "node_group_role" {
+  count = var.enable_node_groups ? 1 : 0
+  name  = "${var.cluster_name}-node-group-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEKSWorkerNodePolicy" {
+  count      = var.enable_node_groups ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.node_group_role[0].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEKS_CNI_Policy" {
+  count      = var.enable_node_groups ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.node_group_role[0].name
+}
+
+resource "aws_iam_role_policy_attachment" "node_group_AmazonEC2ContainerRegistryReadOnly" {
+  count      = var.enable_node_groups ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.node_group_role[0].name
+}
+
+# Node Groups
+resource "aws_eks_node_group" "node_groups" {
+  for_each = var.enable_node_groups ? var.node_groups : {}
+
+  cluster_name    = aws_eks_cluster.cluster.name
+  node_group_name = each.key
+  node_role_arn   = aws_iam_role.node_group_role[0].arn
+  subnet_ids      = length(each.value.subnet_ids) > 0 ? each.value.subnet_ids : var.private_subnet_ids
+
+  capacity_type  = each.value.capacity_type
+  instance_types = each.value.instance_types
+  ami_type       = each.value.ami_type
+  disk_size      = each.value.disk_size
+
+  scaling_config {
+    desired_size = each.value.desired_size
+    max_size     = each.value.max_size
+    min_size     = each.value.min_size
+  }
+
+  update_config {
+    max_unavailable_percentage = 25
+  }
+
+  labels = each.value.labels
+
+  dynamic "taint" {
+    for_each = each.value.taints
+    content {
+      key    = taint.value.key
+      value  = taint.value.value
+      effect = taint.value.effect
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.cluster_name}-${each.key}-node-group"
+  })
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_group_AmazonEKSWorkerNodePolicy,
+    aws_iam_role_policy_attachment.node_group_AmazonEKS_CNI_Policy,
+    aws_iam_role_policy_attachment.node_group_AmazonEC2ContainerRegistryReadOnly,
+  ]
 }

@@ -15,8 +15,14 @@ variable "vpc_id" {
 }
 
 variable "subnet_ids" {
-  description = "List of subnet IDs for EKS cluster"
+  description = "List of subnet IDs for EKS cluster (all subnets)"
   type        = list(string)
+}
+
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for node groups"
+  type        = list(string)
+  default     = []
 }
 
 variable "cluster_endpoint_private_access" {
@@ -121,4 +127,32 @@ variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
   default     = {}
+}
+
+# Node Group Variables
+variable "enable_node_groups" {
+  description = "Enable EKS node groups"
+  type        = bool
+  default     = false
+}
+
+variable "node_groups" {
+  description = "Map of EKS node group configurations"
+  type = map(object({
+    instance_types = list(string)
+    capacity_type  = string
+    min_size      = number
+    max_size      = number
+    desired_size  = number
+    disk_size     = number
+    ami_type      = string
+    subnet_ids    = list(string)
+    labels        = map(string)
+    taints = list(object({
+      key    = string
+      value  = string
+      effect = string
+    }))
+  }))
+  default = {}
 }

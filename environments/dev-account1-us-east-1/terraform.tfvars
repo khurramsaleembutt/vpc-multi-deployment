@@ -36,7 +36,7 @@ cluster_addons = {
     service_account_role_arn = ""
   }
   kube-proxy = {
-    version = "v1.33.0-eksbuild.1"
+    version = "v1.33.0-eksbuild.2"
     resolve_conflicts_on_create = "OVERWRITE"
     resolve_conflicts_on_update = "OVERWRITE"
     service_account_role_arn = ""
@@ -52,6 +52,26 @@ cluster_addons = {
     resolve_conflicts_on_create = "OVERWRITE"
     resolve_conflicts_on_update = "OVERWRITE"
     service_account_role_arn = ""
+  }
+}
+
+# Node Groups
+enable_node_groups = true
+node_groups = {
+  main = {
+    instance_types = ["t3.small"]
+    capacity_type  = "ON_DEMAND"
+    min_size      = 1
+    max_size      = 3
+    desired_size  = 1
+    disk_size     = 20
+    ami_type      = "AL2023_x86_64_STANDARD"
+    subnet_ids    = []  # Will use private subnets from VPC by default
+    labels = {
+      Environment = "dev"
+      NodeGroup   = "main"
+    }
+    taints = []
   }
 }
 

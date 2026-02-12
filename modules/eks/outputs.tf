@@ -67,3 +67,13 @@ output "cloudwatch_log_group_arn" {
   description = "Arn of cloudwatch log group created"
   value       = aws_cloudwatch_log_group.cluster.arn
 }
+
+output "node_groups" {
+  description = "EKS node groups"
+  value       = var.enable_node_groups ? aws_eks_node_group.node_groups : {}
+}
+
+output "node_group_role_arn" {
+  description = "IAM role ARN for EKS node groups"
+  value       = var.enable_node_groups ? aws_iam_role.node_group_role[0].arn : null
+}

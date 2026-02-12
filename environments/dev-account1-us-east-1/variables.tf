@@ -122,3 +122,31 @@ variable "cluster_addons" {
   }))
   default = {}
 }
+
+# Node Group Variables
+variable "enable_node_groups" {
+  description = "Enable EKS node groups"
+  type        = bool
+  default     = false
+}
+
+variable "node_groups" {
+  description = "Map of EKS node group configurations"
+  type = map(object({
+    instance_types = list(string)
+    capacity_type  = string
+    min_size      = number
+    max_size      = number
+    desired_size  = number
+    disk_size     = number
+    ami_type      = string
+    subnet_ids    = list(string)
+    labels        = map(string)
+    taints = list(object({
+      key    = string
+      value  = string
+      effect = string
+    }))
+  }))
+  default = {}
+}

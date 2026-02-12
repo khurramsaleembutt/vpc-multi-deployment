@@ -46,6 +46,7 @@ module "eks" {
   cluster_version                         = var.cluster_version
   vpc_id                                  = module.vpc.vpc_id
   subnet_ids                              = concat(module.vpc.private_subnet_ids, module.vpc.public_subnet_ids)
+  private_subnet_ids                      = module.vpc.private_subnet_ids
   cluster_endpoint_private_access         = var.cluster_endpoint_private_access
   cluster_endpoint_public_access          = var.cluster_endpoint_public_access
   cluster_endpoint_public_access_cidrs    = var.cluster_endpoint_public_access_cidrs
@@ -54,9 +55,11 @@ module "eks" {
   cloudwatch_log_group_retention_in_days  = var.cloudwatch_log_group_retention_in_days
   cluster_addons                          = var.cluster_addons
   enable_irsa                             = true
+  enable_node_groups                      = var.enable_node_groups
+  node_groups                             = var.node_groups
 
   access_config = {
-    bootstrap_cluster_creator_admin_permissions = true
+    bootstrap_cluster_creator_admin_permissions = false
     authentication_mode                         = "API_AND_CONFIG_MAP"
   }
 
