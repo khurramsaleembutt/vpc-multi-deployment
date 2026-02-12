@@ -152,3 +152,70 @@ jobs:
             repo: context.repo.repo,
             body: summary
           });
+
+  # ============================================================================
+  # STAGING ENVIRONMENT (Auto-deploy on merge)
+  # ============================================================================
+  staging-deploy:
+    name: Staging Deploy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: terraform-validate
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: us-east-1
+        role-session-name: terraform-staging-dev-account1-us-east-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        kubectl version --client
+    
+    - name: Terraform Plan & Apply
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
+        terraform apply tfplan
+    
+    - name: EKS Cluster Validation
+      run: |
+        # Validate EKS cluster is ready
+        echo "Validating EKS cluster deployment..."
+        aws eks describe-cluster --name ecommerce-dev-cluster --region us-east-1
+        aws eks list-nodegroups --cluster-name ecommerce-dev-cluster --region us-east-1
+        
+        # Update kubeconfig and test connectivity
+        aws eks update-kubeconfig --region us-east-1 --name ecommerce-dev-cluster
+        kubectl get nodes
+        kubectl get pods -A
+    
+    - name: Integration Tests
+      run: |
+        # Test VPC connectivity, EKS cluster health, etc.
+        echo "Running EKS infrastructure integration tests..."
+        kubectl cluster-info
+        kubectl get svc -A
+        # Add your EKS-specific tests here
+    
+    - name: Prepare for EcommerceApp Deployment
+      run: |
+        # Setup for future EcommerceApp deployment
+        echo "EKS cluster ready for EcommerceApp deployment..."
+        echo "Cluster endpoint: $(aws eks describe-cluster --name ecommerce-dev-cluster --region us-east-1 --query 'cluster.endpoint' --output text)"
+        # Future: Add ArgoCD or Helm setup here
