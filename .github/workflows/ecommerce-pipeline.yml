@@ -7,6 +7,16 @@ on:
   push:
     branches: [main]
     paths: ['environments/**', 'modules/**', '.github/workflows/ecommerce-pipeline.yml']
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+        - plan
+        - destroy
 
 env:
   TF_VERSION: 1.10.0
@@ -25,6 +35,7 @@ jobs:
   terraform-validate:
     name: Validate & Security Scan
     runs-on: ubuntu-latest
+    if: github.event.inputs.action != 'destroy'
     
     steps:
     - uses: actions/checkout@v4
@@ -220,3 +231,37 @@ jobs:
         echo "EKS cluster ready for EcommerceApp deployment..."
         echo "Cluster endpoint: $(aws eks describe-cluster --name ecommerce-dev-cluster --region us-east-1 --query 'cluster.endpoint' --output text)"
         # Future: Add ArgoCD or Helm setup here
+
+  # ============================================================================
+  # DESTROY (Emergency use)
+  # ============================================================================
+  destroy:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment: 
+      name: destruction-approval
+      url: https://console.aws.amazon.com/vpc/
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN_ACCOUNT1 }}
+        aws-region: us-east-1
+        role-session-name: terraform-destroy-dev-account1-us-east-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    
+    - name: Terraform Destroy
+      working-directory: ./environments/dev-account1-us-east-1
+      run: |
+        terraform init
+        sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
+        sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        terraform destroy -var-file="terraform.tfvars" -auto-approve
