@@ -40,6 +40,8 @@ module "vpc" {
 module "eks" {
   source = "../../modules/eks"
 
+  region                                  = var.region
+  aws_profile                             = var.aws_profile
   cluster_name                            = var.enable_eks ? var.cluster_name : ""
   cluster_version                         = var.enable_eks ? var.cluster_version : "1.33"
   vpc_id                                  = module.vpc.vpc_id
