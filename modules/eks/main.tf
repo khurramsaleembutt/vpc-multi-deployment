@@ -144,7 +144,9 @@ resource "aws_eks_access_policy_association" "sso_admin_policy" {
     type = "cluster"
   }
 
-  depends_on = [aws_eks_access_entry.sso_admin]
+  depends_on = [
+    aws_eks_access_entry.sso_admin
+  ]
 }
 
 # EKS Access Entry for GitHub Actions Role

@@ -1,0 +1,3 @@
+# Data sources for current AWS context
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
