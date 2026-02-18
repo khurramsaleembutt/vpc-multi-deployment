@@ -116,6 +116,7 @@ jobs:
       run: |
         sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        sed -i 's/, var.aws_profile != "" ? \["--profile", var.aws_profile\] : \[\]//' ../../modules/eks/providers.tf
         terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform show -json tfplan > plan.json
     
@@ -202,6 +203,7 @@ jobs:
         terraform init
         sed -i 's/aws_profile = .*/# aws_profile removed for CI\/CD/' terraform.tfvars
         sed -i 's/profile = var.aws_profile/# profile removed for CI\/CD/' main.tf
+        sed -i 's/, var.aws_profile != "" ? \["--profile", var.aws_profile\] : \[\]//' ../../modules/eks/providers.tf
         terraform plan -var-file="terraform.tfvars" -out=tfplan
         terraform apply tfplan
     
