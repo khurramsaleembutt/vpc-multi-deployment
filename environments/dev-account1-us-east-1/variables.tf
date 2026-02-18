@@ -150,3 +150,9 @@ variable "node_groups" {
   }))
   default = {}
 }
+# Monitoring Variables
+variable "enable_monitoring" {
+  description = "Enable CloudWatch monitoring and Fluent Bit logging"
+  type        = bool
+  default     = false
+}

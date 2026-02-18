@@ -129,6 +129,18 @@ variable "tags" {
   default     = {}
 }
 
+variable "enable_monitoring" {
+  description = "Enable CloudWatch monitoring and Fluent Bit logging"
+  type        = bool
+  default     = false
+}
+
+variable "environment" {
+  description = "Environment name for logging"
+  type        = string
+  default     = ""
+}
+
 # Node Group Variables
 variable "enable_node_groups" {
   description = "Enable EKS node groups"

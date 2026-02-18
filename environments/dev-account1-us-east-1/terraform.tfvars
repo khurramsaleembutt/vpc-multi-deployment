@@ -75,6 +75,9 @@ node_groups = {
   }
 }
 
+# Monitoring Configuration
+enable_monitoring = true
+
 # Tags
 common_tags = {
   Project     = "multi-vpc-deployment"
