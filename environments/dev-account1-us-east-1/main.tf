@@ -37,31 +37,31 @@ module "vpc" {
   common_tags  = var.common_tags
 }
 
-# EKS Module
 module "eks" {
-  count  = var.enable_eks ? 1 : 0
   source = "../../modules/eks"
 
-  cluster_name                            = var.cluster_name
-  cluster_version                         = var.cluster_version
+  cluster_name                            = var.enable_eks ? var.cluster_name : ""
+  cluster_version                         = var.enable_eks ? var.cluster_version : "1.33"
   vpc_id                                  = module.vpc.vpc_id
-  subnet_ids                              = concat(module.vpc.private_subnet_ids, module.vpc.public_subnet_ids)
-  private_subnet_ids                      = module.vpc.private_subnet_ids
-  cluster_endpoint_private_access         = var.cluster_endpoint_private_access
-  cluster_endpoint_public_access          = var.cluster_endpoint_public_access
-  cluster_endpoint_public_access_cidrs    = var.cluster_endpoint_public_access_cidrs
-  cluster_service_ipv4_cidr               = var.cluster_service_ipv4_cidr
-  cluster_enabled_log_types               = var.cluster_enabled_log_types
-  cloudwatch_log_group_retention_in_days  = var.cloudwatch_log_group_retention_in_days
-  cluster_addons                          = var.cluster_addons
-  enable_irsa                             = true
-  enable_node_groups                      = var.enable_node_groups
-  node_groups                             = var.node_groups
+  subnet_ids                              = var.enable_eks ? concat(module.vpc.private_subnet_ids, module.vpc.public_subnet_ids) : []
+  private_subnet_ids                      = var.enable_eks ? module.vpc.private_subnet_ids : []
+  cluster_endpoint_private_access         = var.enable_eks ? var.cluster_endpoint_private_access : false
+  cluster_endpoint_public_access          = var.enable_eks ? var.cluster_endpoint_public_access : true
+  cluster_endpoint_public_access_cidrs    = var.enable_eks ? var.cluster_endpoint_public_access_cidrs : ["0.0.0.0/0"]
+  cluster_service_ipv4_cidr               = var.enable_eks ? var.cluster_service_ipv4_cidr : null
+  cluster_enabled_log_types               = var.enable_eks ? var.cluster_enabled_log_types : []
+  cloudwatch_log_group_retention_in_days  = var.enable_eks ? var.cloudwatch_log_group_retention_in_days : 7
+  cluster_addons                          = var.enable_eks ? var.cluster_addons : {}
+  enable_irsa                             = var.enable_eks ? true : false
+  enable_node_groups                      = var.enable_eks ? var.enable_node_groups : false
+  node_groups                             = var.enable_eks ? var.node_groups : {}
+  enable_monitoring                       = var.enable_eks ? var.enable_monitoring : false
+  environment                             = var.enable_eks ? var.environment : ""
 
-  access_config = {
+  access_config = var.enable_eks ? {
     bootstrap_cluster_creator_admin_permissions = false
     authentication_mode                         = "API_AND_CONFIG_MAP"
-  }
+  } : null
 
   tags = var.common_tags
 }
